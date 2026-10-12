@@ -33,6 +33,11 @@ const goTo = (path: string) => {
 };
 
 export default definePluginApp((app) => {
+  // A throw anywhere in here makes the host publish NONE of this bundle's slots or CSS,
+  // so the whole plugin disappears from the UI (not just the surface that failed).
+  // Guard the call below, and keep this body defensive: five of the surfaces used here
+  // are still `experimental_`, and bb can drop or rename one in any release.
+  try {
   app.slots.experimental_threadList({
     id: "rail",
     title: "NavAIgate rail",
@@ -143,7 +148,21 @@ export default definePluginApp((app) => {
     ),
   });
   // NavAIgate mark in bb's sidebar header (choose it in Settings, Appearance).
-  app.slots.experimental_sidebarHeader({ id: "navaigate-header", title: "NavAIgate", description: "The NavAIgate orb and name at the top of the sidebar.", component: HeaderMark });
+  // Feature-detected: bb-app 0.46.0 exposes no sidebar-header slot at all (it has
+  // experimental_sidebarFooter / _sidebarAccessory / _sidebarNavigation, but nothing for
+  // the header), where calling a missing slot throws
+  // "TypeError: app.slots.experimental_sidebarHeader is not a function". Unguarded, that
+  // one line hid every other surface in this plugin. On a bb that has the slot this still
+  // registers normally.
+  const sidebarHeader = (app.slots as unknown as Record<string, unknown>).experimental_sidebarHeader;
+  if (typeof sidebarHeader === "function") {
+    (sidebarHeader as (r: { id: string; title: string; description: string; component: unknown }) => void)({
+      id: "navaigate-header",
+      title: "NavAIgate",
+      description: "The NavAIgate orb and name at the top of the sidebar.",
+      component: HeaderMark,
+    });
+  }
   // Dashboard: any local web app you run, framed as a page in bb (setting: Dashboards).
   app.slots.navPanel({
     id: "dashboard",
@@ -187,4 +206,9 @@ export default definePluginApp((app) => {
     icon: "navaigate-workspace/contrast",
     onActivate: () => toggleMode(),
   });
+  } catch (e) {
+    // Contained: whatever survived registration above still publishes. Never rethrow —
+    // one unavailable surface must not take the whole plugin down with it.
+    console.error("[navaigate-workspace] app setup failed part-way", e);
+  }
 });
