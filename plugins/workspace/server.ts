@@ -54,7 +54,12 @@ export const rpcContract = defineRpcContract({
   profile_get: { input: z.null(), output: profileSchema },
   profile_save: { input: profileSchema, output: profileSchema },
   keys_status: { input: z.null(), output: z.record(z.enum(KEY_NAMES), z.boolean()) },
-  keys_save: { input: z.record(z.enum(KEY_NAMES), z.string().max(400)), output: z.record(z.enum(KEY_NAMES), z.boolean()) },
+  // partialRecord, not record: with Zod 4 a record keyed by an enum is EXHAUSTIVE, so
+  // z.record(z.enum(KEY_NAMES), ...) rejects any payload that omits a key. The wizard only
+  // sends the keys actually entered (Set up invites you to skip the ones you don't use),
+  // so entering one to four keys failed validation, keys_save threw, and the whole finish
+  // step aborted before profile_save ran — no profile, no keys, an RPC error on screen.
+  keys_save: { input: z.partialRecord(z.enum(KEY_NAMES), z.string().max(400)), output: z.record(z.enum(KEY_NAMES), z.boolean()) },
   keys_test: { input: z.object({ name: z.enum(KEY_NAMES), value: z.string().max(400) }), output: z.object({ ok: z.boolean(), message: z.string() }) },
   tag_create: { input: z.object({ name: z.string().trim().min(1).max(32), color: z.enum(TAG_COLORS) }), output: tagSchema },
   tag_update: { input: z.object({ id: z.string(), name: z.string().trim().min(1).max(32).optional(), color: z.enum(TAG_COLORS).optional() }), output: stateSchema },

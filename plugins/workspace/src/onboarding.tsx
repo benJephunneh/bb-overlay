@@ -110,10 +110,24 @@ export function SetupWizard({ onDone }: { onDone?: () => void }) {
     setSaving(true);
     try {
       const entered = Object.fromEntries(Object.entries(keys).filter(([, v]) => v && v.trim())) as Record<KeyName, string>;
-      if (Object.keys(entered).length) setKeySet(await rpc.call("keys_save", entered));
       const areas = draft.areas.filter((a) => a.name.trim());
+      // Profile first. It is what marks onboarding done and opens Home, and it must not be
+      // lost because a key failed to save — previously keys_save ran first and its throw
+      // aborted this whole block, discarding the profile and every key with it.
       await rpc.call("profile_save", { ...draft, name: draft.name.trim(), areas, onboarded: true });
-      toast.success("Workspace set up", { description: "Change any of it later from Set up in the sidebar." });
+      let keyWarning: string | null = null;
+      if (Object.keys(entered).length) {
+        try {
+          setKeySet(await rpc.call("keys_save", entered));
+        } catch (e) {
+          keyWarning = e instanceof Error ? e.message : String(e);
+        }
+      }
+      if (keyWarning) {
+        toast.error("Workspace set up, but your keys were not saved", { description: keyWarning });
+      } else {
+        toast.success("Workspace set up", { description: "Change any of it later from Set up in the sidebar." });
+      }
       onDone?.();
     } catch (e) {
       toast.error("Could not save", { description: e instanceof Error ? e.message : String(e) });
