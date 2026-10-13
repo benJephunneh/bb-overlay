@@ -30,8 +30,9 @@ About 15 minutes. No coding needed: bb's agent does the technical part for you.
 In bb, open **Settings, then Appearance**:
 
 - **Theme:** NavAIgate
-- **Sidebar header:** NavAIgate
 - **Thread list:** NavAIgate rail
+
+On bb 0.46.0 and later there is no **Sidebar header** entry to choose: bb removed that surface in [get-bb/bb#5229](https://github.com/get-bb/bb/pull/5229), so the NavAIgate mark at the top of the sidebar is skipped. Nothing else changes.
 
 ## 3. Set up your workspace
 

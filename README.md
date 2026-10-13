@@ -49,7 +49,9 @@ bb plugin install git:https://github.com/skyremote/bb-overlay.git@main --plugin 
 bb plugin install git:https://github.com/skyremote/bb-overlay.git@main --plugin kanban
 ```
 
-Then pick the look in bb: **Settings, Appearance**. Choose the NavAIgate theme, the NavAIgate sidebar header, and the NavAIgate rail as the thread list.
+Then pick the look in bb: **Settings, Appearance**. Choose the NavAIgate theme and the NavAIgate rail as the thread list.
+
+On bb 0.46.0 and later there is no **Sidebar header** choice to make: bb removed that surface in [get-bb/bb#5229](https://github.com/get-bb/bb/pull/5229), so the NavAIgate mark at the top of the sidebar is skipped. Everything else is unaffected.
 
 Not technical? Follow the step-by-step guide in [INSTALL.md](INSTALL.md).
 

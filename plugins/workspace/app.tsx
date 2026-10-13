@@ -162,6 +162,14 @@ export default definePluginApp((app) => {
       description: "The NavAIgate orb and name at the top of the sidebar.",
       component: HeaderMark,
     });
+  } else {
+    // Not an error, and not silent: bb 0.46.0 removed this surface (get-bb/bb#5229,
+    // merged 2026-10-08) along with the "Settings → Appearance → Sidebar header" choice,
+    // so there is nowhere to put the mark. Say why, so a missing mark reads as a change
+    // in bb rather than a broken plugin.
+    console.warn(
+      "[navaigate-workspace] this bb has no sidebar-header slot (removed in bb 0.46.0, get-bb/bb#5229); skipping the NavAIgate sidebar mark.",
+    );
   }
   // Dashboard: any local web app you run, framed as a page in bb (setting: Dashboards).
   app.slots.navPanel({
