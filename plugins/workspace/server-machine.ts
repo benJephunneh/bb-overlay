@@ -174,9 +174,11 @@ export async function handOff(input: z.infer<typeof machineHandoffInput>): Promi
   ].join("\n");
   const file = path.join(os.tmpdir(), `always-on-handoff-${input.threadId}.md`);
   fs.writeFileSync(file, brief);
-  const provider = ["claude-code", "codex", "acp-cursor", "pi"].includes(input.providerId) ? input.providerId : "claude-code";
+  // Send the provider the chat already runs on. When it is not one we recognise, say
+  // nothing and let the machine's own bb default decide.
+  const provider = ["claude-code", "codex", "acp-cursor", "pi"].includes(input.providerId) ? input.providerId : null;
   try {
-    const out = await alwaysOn(["send", "--provider", provider, "--title", input.title.slice(0, 80) || "Handed-over chat", "-f", file], { BB_THREAD_ID: input.threadId }, 180_000);
+    const out = await alwaysOn(["send", ...(provider ? ["--provider", provider] : []), "--title", input.title.slice(0, 80) || "Handed-over chat", "-f", file], { BB_THREAD_ID: input.threadId }, 180_000);
     const remoteThread = out.match(/sent: (\S+)/)?.[1] ?? "";
     const url = out.match(/watch: (https?:\S+)/)?.[1] ?? "";
     if (!remoteThread) throw new Error(out.trim().split("\n").slice(-2).join(" "));

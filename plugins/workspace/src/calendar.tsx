@@ -66,8 +66,10 @@ function AskCalendar() {
     } catch {
       /* the chat can still look them up */
     }
-    // Route the question (not the event list) through Ask/Jev; low confidence falls back to Claude Code.
-    let harness: Who = "claude";
+    // Route the question (not the event list) through Ask/Jev. No harness is named here: if
+    // Jev cannot decide, the route's own choice stands, and if the call fails outright the
+    // chat starts on bb's default provider.
+    let harness: Who | null = null;
     try {
       const route = (await rpc.call("ask_route", { text: question, pick: "auto", available: { claude: available("claude"), codex: available("codex"), cursor: available("cursor") } })) as {
         decisionId: string;
@@ -75,8 +77,8 @@ function AskCalendar() {
         autoStart: boolean;
         message: string;
       };
-      harness = route.autoStart ? route.harness : available("claude") ? "claude" : route.harness;
-      setNote(route.autoStart ? route.message : `Jev was unsure, so Claude Code takes it.`);
+      harness = route.harness;
+      setNote(route.autoStart ? route.message : `Jev was unsure, so it starts on ${route.harness}.`);
       void rpc.call("ask_commit", { decisionId: route.decisionId, harness }).catch(() => {});
     } catch {
       setNote(null);
@@ -88,7 +90,7 @@ function AskCalendar() {
         : "I could not paste my events; read them from Google Calendar through Composio (GOOGLECALENDAR_EVENTS_LIST on both connected accounts).",
       "Read-only: do not create, move or cancel any event, and do not email anyone, unless I say so.",
     ].join("\n\n");
-    const ok = await spawn("cal", question.slice(0, 80), prompt, PROVIDER_ID[harness]);
+    const ok = await spawn("cal", question.slice(0, 80), prompt, harness ? PROVIDER_ID[harness] : undefined);
     if (ok) setText("");
   };
 

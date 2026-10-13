@@ -234,7 +234,9 @@ function SpinUp({ threadId, root, fleetAgent, clearFleet }: { threadId: string; 
     setOwn(leadsByDefault(fleetAgent));
     const pin = (fleetAgent.model ?? "").toLowerCase();
     if (!pin || pin === "inherit") return;
-    const providerId = /gpt|codex|o\d/.test(pin) ? "codex" : root.providerId.includes("claude") ? root.providerId : "claude-code";
+    // A recognisable pinned model picks the provider; otherwise stay on the provider this
+    // chat already runs on, rather than assuming Claude Code.
+    const providerId = /gpt|codex|o\d/.test(pin) ? "codex" : root.providerId;
     let live = true;
     sdk.providers
       .models({ providerId })

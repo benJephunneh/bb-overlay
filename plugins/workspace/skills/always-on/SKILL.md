@@ -26,7 +26,7 @@ Run `always-on where` to see whether the user is home or away. It prints `home` 
    - **Where to save:** the folder the result belongs in.
 2. Save it to a temp file and run:
    `always-on send --title "<short title>" [--provider codex|acp-cursor] [--project <bb project name>] -f /tmp/brief.md`
-   - The default project is the storage home project if one is set, otherwise the personal workspace. The default provider is Claude Code.
+   - The default project is the storage home project if one is set, otherwise the personal workspace. With no `--provider`, bb on the machine runs it on its own default provider.
    - `--folder <path>` runs the job inside that folder.
    - The script adds the house rules (save to storage when there is some, keep the reply short, end with an `OUTPUTS:` list) and rewrites this laptop's home-folder paths for the machine.
 3. Give the user the `watch:` link it prints. That's the machine's bb, and they can follow the thread live from the laptop or phone.

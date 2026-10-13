@@ -73,7 +73,6 @@ export function InboxCard() {
       const made = await sdk.threads.spawn({
         projectId: project.id,
         environment: { type: "project-default" },
-        providerId: "claude-code",
         title: `Reply: ${m.subject}`.slice(0, 80),
         visibility: "visible",
         prompt,
