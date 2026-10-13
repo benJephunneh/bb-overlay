@@ -12,7 +12,8 @@
 #   always-on url [THREAD]               web address of the machine's bb (laptop or phone)
 #   always-on send [opts] (-p TEXT | -f FILE | stdin)
 #        --project NAME                  bb project on the machine (default: storage home project, else personal)
-#        --provider ID                   claude-code (default) | codex | acp-cursor | pi
+#        --provider ID                   codex | acp-cursor | pi | claude-code
+#                                        (leave it out to use the machine's own default)
 #        --model ID  --title TEXT
 #        --folder PATH                   run inside this folder on the machine
 #   always-on list                       recent threads on the machine
@@ -126,7 +127,7 @@ for p in d:
 }
 
 cmd_send() {
-  local project="$HOME_PROJECT" provider="claude-code" model="" title="" text="" file="" workdir=""
+  local project="$HOME_PROJECT" provider="" model="" title="" text="" file="" workdir=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --project) project="$2"; shift 2;;
@@ -167,7 +168,9 @@ cmd_send() {
   if [ -n "$workdir" ]; then
     if [ -n "$STORAGE" ] && [[ "$workdir" != /* || "$workdir" == "$STORAGE"/* || "$workdir" == "$LOCAL"/* ]]; then folder="$STORAGE/$(rel "$workdir")"; else folder="$workdir"; fi
   elif [ "$provider" = acp-cursor ] && [ -n "$STORAGE" ] && [ "$folder" = "$STORAGE" ]; then pid=proj_personal; folder=""; project=personal; fi
-  local args="--project $pid --provider $provider --permission-mode full --json --prompt-file -"
+  # No --provider unless one was named: bb on the machine uses its own default provider.
+  local args="--project $pid --permission-mode full --json --prompt-file -"
+  [ -n "$provider" ] && args="$args --provider $provider"
   [ -n "$folder" ] && args="$args --environment $(printf %q "$folder")"
   [ -n "$model" ] && args="$args --model $(printf %q "$model")"
   [ -n "$title" ] && args="$args --title $(printf %q "$title")"

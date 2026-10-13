@@ -30,14 +30,20 @@ export function useSpawn() {
   const project = useWorkProject();
   const [busy, setBusy] = useState<string | null>(null);
 
-  const spawn = async (key: string, title: string, prompt: string, providerId: string = PROVIDER_ID.claude) => {
+  /**
+   * Start a chat. `providerId` is optional on purpose: leave it out and bb's own default
+   * provider runs the work. Nothing here names a harness, so a chat started from a Home
+   * card (Run today's brief, and anything else that does not pass one) lands where bb
+   * would put it — not on Claude Code because nobody chose anything.
+   */
+  const spawn = async (key: string, title: string, prompt: string, providerId?: string) => {
     if (!project || busy) return false;
     setBusy(key);
     try {
       const made = await sdk.threads.spawn({
         projectId: project.id,
         environment: { type: "project-default" },
-        providerId,
+        ...(providerId ? { providerId } : {}),
         title: title.slice(0, 80),
         visibility: "visible",
         prompt,

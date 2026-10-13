@@ -123,7 +123,7 @@ export function createAsk(bb: BbPluginApi) {
     const id = randomUUID();
     const base = { id, at: Date.now(), text: input.text.slice(0, 120), chosen: null, latencyMs: null, costUsd: null };
     const avail = (h: Harness) => input.available[h];
-    const firstAvail = HARNESSES.find(avail) ?? "claude";
+    const firstAvail = HARNESSES.find(avail) ?? HARNESSES[0];
 
     // 1. Free gate: a picked chip, then a harness named in the text.
     const gate = input.pick !== "auto" ? { h: input.pick, source: "chip" as const } : named(input.text) ? { h: named(input.text) as Harness, source: "text" as const } : null;
@@ -139,15 +139,16 @@ export function createAsk(bb: BbPluginApi) {
       const p = d.answers.work.noul;
       const odds = Object.fromEntries(HARNESSES.map((h) => [h, avail(h) ? Math.round(p * (d.answers.worker.probabilities[h] ?? 0) * 100) / 100 : 0])) as Record<Harness, number>;
       const top = [...HARNESSES].sort((a, b) => odds[b] - odds[a])[0];
-      // A quick question scores low on "work" everywhere; suggest Claude Code then.
-      const harness = odds[top] > 0 ? top : avail("claude") ? "claude" : firstAvail;
+      // A quick question scores low on "work" everywhere; take the first harness that is
+      // actually available rather than naming one.
+      const harness = odds[top] > 0 ? top : firstAvail;
       const confidence = odds[harness];
       const effort = (EFFORTS as readonly string[]).includes(d.answers.effort.choice) ? (d.answers.effort.choice as (typeof EFFORTS)[number]) : null;
       await edit((log) => void log.push({ ...base, source: "jev", suggested: harness, odds, confidence, effort, latencyMs, costUsd }));
       const autoStart = confidence >= FLOOR;
       return { decisionId: id, source: "jev", harness, odds, confidence, effort, autoStart, message: autoStart ? `Jev picked ${LABEL[harness]} (${confidence.toFixed(2)})` : `Jev is not sure (${confidence.toFixed(2)})` };
     } catch (e) {
-      const harness = avail("claude") ? "claude" : firstAvail;
+      const harness = firstAvail;
       await edit((log) => void log.push({ ...base, source: "fallback", suggested: harness, odds: null, confidence: null, effort: null }));
       return { decisionId: id, source: "fallback", harness, odds: null, confidence: null, effort: null, autoStart: true, message: `Jev unreachable (${String(e instanceof Error ? e.message : e)}), started on ${LABEL[harness]}.` };
     }
