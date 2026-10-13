@@ -4,9 +4,8 @@
 import { execFile } from "node:child_process";
 import net from "node:net";
 import { z } from "zod";
+import { BASE_PATH } from "./server-os";
 import { profile } from "./server-profile";
-
-const BASE_PATH = "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin";
 
 export const whereSchema = z.object({
   /** false when no storage at home is set up: the chip hides and new work starts in the usual project. */

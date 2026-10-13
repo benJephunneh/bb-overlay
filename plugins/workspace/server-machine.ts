@@ -9,6 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { BASE_PATH } from "./server-os";
 import { CONFIG_DIR, profile } from "./server-profile";
 
 export const machineItemSchema = z.object({
@@ -97,7 +98,6 @@ function scriptPath(): string {
 
 const BB_APP_BIN = "/Applications/bb.app/Contents/MacOS/bb";
 const BB_CLI = "/Applications/bb.app/Contents/Resources/app.asar.unpacked/node_modules/bb-app/host-daemon/dist/bb";
-const BASE_PATH = "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin";
 const MAX_FILE = 50 * 1024 * 1024;
 
 export const machineHandoffInput = z.object({ threadId: z.string().min(1), title: z.string().max(200), providerId: z.string().max(60) });

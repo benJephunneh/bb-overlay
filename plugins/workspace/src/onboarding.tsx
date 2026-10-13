@@ -77,7 +77,10 @@ const btn = "rounded-md border border-border px-3 py-1.5 text-[12.5px] text-fore
 const primary = "rounded-md bg-foreground px-4 py-1.5 text-[12.5px] font-medium text-background disabled:opacity-40";
 
 type Storage = NonNullable<Profile["storage"]>;
-const NEW_STORAGE: Storage = { label: "NAS", path: "/Volumes/", localCopy: "~/Storage_Local", homeCheck: "", homeProject: "", awayProject: "" };
+// An empty path on purpose: a share's mount point is machine-specific, so we ask rather
+// than pre-fill. "/Volumes/" used to sit here as a macOS default and doubled as the
+// "not set" sentinel — on Linux it silently became the configured mount path.
+const NEW_STORAGE: Storage = { label: "NAS", path: "", localCopy: "~/Storage_Local", homeCheck: "", homeProject: "", awayProject: "" };
 
 export function SetupWizard({ onDone }: { onDone?: () => void }) {
   const rpc = useRpc<typeof rpcContract>();
@@ -88,12 +91,17 @@ export function SetupWizard({ onDone }: { onDone?: () => void }) {
   const [keySet, setKeySet] = useState<Record<string, boolean>>({});
   const [tests, setTests] = useState<Record<string, { ok: boolean; message: string } | "testing">>({});
   const [saving, setSaving] = useState(false);
+  /** The OS bb is running on, for the storage mount-point example. */
+  const [system, setSystem] = useState<{ mountExample: string } | null>(null);
 
   useEffect(() => {
     if (profile && !draft) setDraft(profile);
   }, [profile, draft]);
   useEffect(() => {
     rpc.call("keys_status").then(setKeySet, () => undefined);
+  }, [rpc]);
+  useEffect(() => {
+    rpc.call("system_info").then(setSystem, () => undefined);
   }, [rpc]);
 
   if (!draft) return <div className="p-8 text-[13px] text-muted-foreground">Loading…</div>;
@@ -111,6 +119,12 @@ export function SetupWizard({ onDone }: { onDone?: () => void }) {
     try {
       const entered = Object.fromEntries(Object.entries(keys).filter(([, v]) => v && v.trim())) as Record<KeyName, string>;
       const areas = draft.areas.filter((a) => a.name.trim());
+      // The schema requires a mount path once storage is on. Say that plainly here, rather
+      // than letting the save fail with a validation error.
+      if (draft.storage && !draft.storage.path.trim()) {
+        toast.error("Storage at home needs its mount path", { description: "Go back to Always-on machine and fill in where the share is mounted on this machine." });
+        return;
+      }
       // Profile first. It is what marks onboarding done and opens Home, and it must not be
       // lost because a key failed to save — previously keys_save ran first and its throw
       // aborted this whole block, discarding the profile and every key with it.
@@ -289,7 +303,7 @@ export function SetupWizard({ onDone }: { onDone?: () => void }) {
                     {(
                       [
                         ["label", "What you call it", "NAS"],
-                        ["path", "Where it's mounted (same on both machines)", "/Volumes/MyNAS"],
+                        ["path", "Where it's mounted (same on both machines)", system?.mountExample ?? "/mnt/MyNAS"],
                         ["localCopy", "Local copies when away", "~/Storage_Local"],
                         ["homeCheck", "Address only reachable at home (host:port)", "192.168.0.10:445"],
                         ["homeProject", "bb project on the share", "My NAS"],
@@ -319,7 +333,10 @@ export function SetupWizard({ onDone }: { onDone?: () => void }) {
                     .join(", ") || "none yet (Home works, the connected cards stay empty)"}
                 </li>
                 <li>Always-on machine: {draft.machine?.sshHost ? `${draft.machine.label} (${draft.machine.sshHost})` : "none"}</li>
-                <li>Storage at home: {draft.storage?.path && draft.storage.path !== "/Volumes/" ? `${draft.storage.label} at ${draft.storage.path}` : "none"}</li>
+                <li>
+                  Storage at home:{" "}
+                  {!draft.storage ? "none" : draft.storage.path.trim() ? `${draft.storage.label} at ${draft.storage.path}` : "needs a mount path — go back to Always-on machine"}
+                </li>
               </ul>
             </div>
           ) : null}
