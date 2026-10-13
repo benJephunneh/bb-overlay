@@ -5,21 +5,107 @@
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { BASE_PATH } from "./server-os";
 
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// A Chromium-family binary we can drive over the DevTools protocol — deliberately not
+// "the system default browser". Firefox and Safari don't implement
+// --remote-debugging-port/DevToolsActivePort, so a default that happens to be Firefox
+// would fail here in a way that reads as "no browser installed".
+const MAC_APPS = ["Google Chrome", "Chromium", "Google Chrome Canary", "Brave Browser", "Microsoft Edge", "Vivaldi"];
+const LINUX_COMMANDS = ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "brave-browser", "microsoft-edge", "vivaldi-stable", "vivaldi"];
+/** Exec names we trust to be Chromium-family when we meet one as the xdg default browser. */
+const CHROMIUM_EXECS = /^(google-chrome|chromium|chrome|brave-browser|brave|microsoft-edge|msedge|vivaldi|opera)/;
+
+function isExecutable(p: string): boolean {
+  try {
+    return fs.statSync(p).isFile() && (fs.accessSync(p, fs.constants.X_OK), true);
+  } catch {
+    return false;
+  }
+}
+
+/** Find a command on the plugin's PATH without shelling out. */
+function which(cmd: string): string | null {
+  for (const dir of BASE_PATH.split(":")) {
+    if (!dir) continue;
+    const p = path.join(dir, cmd);
+    if (isExecutable(p)) return p;
+  }
+  return null;
+}
+
+/**
+ * The binary behind the desktop's default web browser, when it is one we can drive.
+ * `xdg-settings` names a .desktop file; we read its Exec and accept it only if the
+ * executable looks Chromium-family, so a Firefox default falls through to the list above
+ * rather than being mistaken for a working browser.
+ */
+function xdgDefaultBrowser(): string | null {
+  if (process.platform !== "linux") return null;
+  try {
+    const desktop = execFileSync("xdg-settings", ["get", "default-web-browser"], { env: { ...process.env, PATH: BASE_PATH }, timeout: 5_000, encoding: "utf8" }).trim();
+    if (!desktop) return null;
+    const dirs = [process.env.XDG_DATA_HOME, path.join(os.homedir(), ".local", "share"), ...(process.env.XDG_DATA_DIRS ?? "/usr/local/share:/usr/share").split(":")].filter(Boolean) as string[];
+    for (const dir of dirs) {
+      const file = path.join(dir, "applications", desktop);
+      if (!fs.existsSync(file)) continue;
+      const exe = fs.readFileSync(file, "utf8").match(/^\s*Exec\s*=\s*"([^"]+)"|^\s*Exec\s*=\s*(\S+)/m);
+      const first = exe?.[1] ?? exe?.[2];
+      if (!first) continue;
+      const name = path.basename(first);
+      if (!CHROMIUM_EXECS.test(name)) return null;
+      return which(name) ?? (isExecutable(first) ? first : null);
+    }
+  } catch {
+    /* no xdg-settings, or it failed: fall through to the caller's error */
+  }
+  return null;
+}
+
+let cachedBrowser: string | null = null;
+
+/** The headless browser to drive, resolved once per process. */
+export function browserPath(): string {
+  if (cachedBrowser) return cachedBrowser;
+  const tried: string[] = [];
+  const override = process.env.NAVAIGATE_BROWSER;
+  if (override) {
+    if (isExecutable(override)) return (cachedBrowser = override);
+    tried.push(override);
+  }
+  if (process.platform === "darwin") {
+    for (const app of MAC_APPS) {
+      const p = `/Applications/${app}.app/Contents/MacOS/${app}`;
+      if (isExecutable(p)) return (cachedBrowser = p);
+      tried.push(p);
+    }
+  } else {
+    for (const cmd of LINUX_COMMANDS) {
+      const p = which(cmd);
+      if (p) return (cachedBrowser = p);
+      tried.push(cmd);
+    }
+    const xdg = xdgDefaultBrowser();
+    if (xdg) return (cachedBrowser = xdg);
+  }
+  throw new Error(
+    `no Chromium-family browser found (looked for ${tried.slice(0, 4).join(", ")}${tried.length > 4 ? ", …" : ""}${process.platform === "linux" ? ", and the desktop's default browser" : ""}). Chrome, Chromium, Brave, Edge or Vivaldi all work — install one, or set NAVAIGATE_BROWSER to the binary you want.`,
+  );
+}
 
 type Evaluate = (expression: string) => Promise<unknown>;
 
 async function withHeadless<T>(startUrl: string, fn: (evaluate: Evaluate) => Promise<T>, budgetMs = 45_000): Promise<T> {
-  if (!fs.existsSync(CHROME)) throw new Error("Google Chrome is not installed");
+  const browser = browserPath(); // throws with a useful message when there is no Chromium-family browser
   const WS = (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
   if (!WS) throw new Error("no WebSocket in this runtime");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nav-audience-"));
   const child = spawn(
-    CHROME,
+    browser,
     ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${dir}`, "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--window-size=1400,1200", `--user-agent=${UA}`, startUrl],
     { stdio: "ignore" },
   );

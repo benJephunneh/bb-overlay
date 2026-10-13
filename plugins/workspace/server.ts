@@ -23,6 +23,7 @@ import { calendarInput, calendlySchema, createCalendar } from "./server-calendar
 import { AUDIENCE_PLATFORMS, audienceSchema, createAudience } from "./server-audience";
 import { HARNESSES, askLogOutput, askRouteInput, askRouteOutput, createAsk } from "./server-ask";
 import { createMachine, handOff, machineHandoffInput, machineHandoffOutput, machineLog, machineLogOutput, machineStateSchema, machineTell } from "./server-machine";
+import { systemInfo, systemSchema } from "./server-os";
 import { createWhere, machineAnswers, whereSchema } from "./server-where";
 import { KEY_NAMES, keyStatus, profile, profileSchema, saveKeys, saveProfile, testKey } from "./server-profile";
 
@@ -51,6 +52,9 @@ export const rpcContract = defineRpcContract({
   machine_tell: { input: z.object({ threadId: z.string().min(1), text: z.string().trim().min(1).max(20_000) }), output: z.object({ ok: z.boolean() }) },
   machine_test: { input: z.object({ sshHost: z.string().trim().min(1).max(120) }), output: z.object({ ok: z.boolean(), message: z.string() }) },
   where_now: { input: z.null(), output: whereSchema },
+  // Which machine bb runs on, for the Set up form's mount-point example. The window filling
+  // the form in may be a remote browser, so the client's own OS is the wrong answer.
+  system_info: { input: z.null(), output: systemSchema },
   profile_get: { input: z.null(), output: profileSchema },
   profile_save: { input: profileSchema, output: profileSchema },
   keys_status: { input: z.null(), output: z.record(z.enum(KEY_NAMES), z.boolean()) },
@@ -266,6 +270,7 @@ export default async function plugin(bb: BbPluginApi) {
     machine_state: () => machine.get(),
     machine_refresh: () => machine.refresh(),
     where_now: () => where.where(),
+    system_info: () => systemInfo(),
     machine_log: ({ threadId }) => machineLog(threadId),
     machine_tell: ({ threadId, text }) => machineTell(threadId, text),
     machine_handoff: async (input) => {
